@@ -19,15 +19,9 @@ spec:
       #securityContext:
       #   fsGroup: 1001
       volumes:
-        - ephemeral:
-            volumeClaimTemplate:
-              spec:
-                accessModes:
-                  - ReadWriteOnce
-                resources:
-                  requests:
-                    storage: 2Gi
-          name: dynamic-plugins-root
+        - name: dynamic-plugins-root
+          persistentVolumeClaim:
+            claimName: dynamic-plugins-root
         - name: dynamic-plugins-npmrc
           secret:
             defaultMode: 420

@@ -47,6 +47,7 @@ type BackstageModel struct {
 
 	backstageDeployment *BackstageDeployment
 	backstageService    *BackstageService
+	dynamicPluginsPvc   *DynamicPluginsPVC
 
 	localDbStatefulSet *DbStatefulSet
 	LocalDbService     *DbService

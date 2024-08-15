@@ -17,6 +17,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 	"reflect"
 
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -39,8 +40,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
-
 	bs "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -51,7 +50,8 @@ import (
 )
 
 const (
-	FIELD_MANAGER = "backstage-controller"
+	// FieldManager is the field manager used in ServerSide Apply and Create
+	FIELD_MANGER = "backstage-controller"
 )
 
 var watchedConfigSelector = metav1.LabelSelector{
@@ -147,7 +147,6 @@ func errorAndStatus(backstage *bs.Backstage, msg string, err error) error {
 }
 
 func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.RuntimeObject) error {
-
 	lg := log.FromContext(ctx)
 
 	for _, obj := range objects {
@@ -156,11 +155,11 @@ func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.
 		// do not read Secrets
 		if _, ok := obj.Object().(*corev1.Secret); ok {
 			// try to create
-			if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: FIELD_MANAGER}); err != nil {
+			if err := r.Create(ctx, obj.Object(), &client.CreateOptions{FieldManager: FIELD_MANGER}); err != nil {
 				if !errors.IsAlreadyExists(err) {
 					return fmt.Errorf("failed to create secret: %w", err)
 				}
-				//if DBSecret - nothing to do, it is not for update
+				// if DBSecret - nothing to do, it is not for update
 				if _, ok := obj.(*model.DbSecret); ok {
 					continue
 				}
@@ -168,14 +167,13 @@ func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.
 				lg.V(1).Info("create secret ", objDispName(obj), obj.Object().GetName())
 				continue
 			}
-
 		} else {
 			if err := r.Get(ctx, types.NamespacedName{Name: obj.Object().GetName(), Namespace: obj.Object().GetNamespace()}, baseObject); err != nil {
 				if !errors.IsNotFound(err) {
 					return fmt.Errorf("failed to get object: %w", err)
 				}
 
-				if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: FIELD_MANAGER}); err != nil {
+				if err := r.Create(ctx, obj.Object(), &client.CreateOptions{FieldManager: FIELD_MANGER}); err != nil {
 					return fmt.Errorf("failed to create object %w", err)
 				}
 
@@ -213,8 +211,7 @@ func objDispName(obj model.RuntimeObject) string {
 }
 
 func (r *BackstageReconciler) patchObject(ctx context.Context, baseObject client.Object, obj model.RuntimeObject) error {
-
-	//lg := log.FromContext(ctx)
+	// lg := log.FromContext(ctx)
 
 	// restore labels and annotations
 	if baseObject.GetLabels() != nil {
@@ -244,7 +241,7 @@ func (r *BackstageReconciler) patchObject(ctx context.Context, baseObject client
 		objectKind.SetGroupVersionKind(baseObject.GetObjectKind().GroupVersionKind())
 	}
 
-	if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: FIELD_MANAGER}); err != nil {
+	if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: FIELD_MANGER}); err != nil {
 		return fmt.Errorf("failed to patch object %s: %w", objDispName(obj), err)
 	}
 
@@ -252,7 +249,6 @@ func (r *BackstageReconciler) patchObject(ctx context.Context, baseObject client
 }
 
 func (r *BackstageReconciler) cleanObjects(ctx context.Context, backstage bs.Backstage) error {
-
 	const failedToCleanup = "failed to cleanup runtime"
 	// check if local database disabled, respective objects have to deleted/unowned
 	if !backstage.Spec.IsLocalDbEnabled() {
@@ -300,12 +296,11 @@ func setStatusCondition(backstage *bs.Backstage, condType bs.BackstageConditionT
 // requestByLabel returns a request with current Namespace and Backstage Object name taken from label
 // or empty request object if label not found
 func (r *BackstageReconciler) requestByLabel(ctx context.Context, object client.Object) []reconcile.Request {
-
 	lg := log.FromContext(ctx)
 
 	backstageName := object.GetAnnotations()[model.BackstageNameAnnotation]
 	if backstageName == "" {
-		//lg.V(1).Info(fmt.Sprintf("warning: %s annotation is not defined for %s, Backstage instances will not be reconciled in this loop", model.BackstageNameAnnotation, object.GetName()))
+		// lg.V(1).Info(fmt.Sprintf("warning: %s annotation is not defined for %s, Backstage instances will not be reconciled in this loop", model.BackstageNameAnnotation, object.GetName()))
 		return []reconcile.Request{}
 	}
 
@@ -347,12 +342,10 @@ func (r *BackstageReconciler) requestByLabel(ctx context.Context, object client.
 
 	lg.V(1).Info("enqueuing reconcile for", object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), "new hash: ", newHash, "old hash: ", oldHash)
 	return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: backstage.Name, Namespace: object.GetNamespace()}}}
-
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
-
 	pred, err := predicate.LabelSelectorPredicate(watchedConfigSelector)
 	if err != nil {
 		return fmt.Errorf("failed to construct the predicate for matching secrets. This should not happen: %w", err)
@@ -382,7 +375,7 @@ func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			builder.WithPredicates(pred, predicate.Funcs{
 				DeleteFunc: func(e event.DeleteEvent) bool { return true },
 				UpdateFunc: func(e event.UpdateEvent) bool { return true },
-				//CreateFunc: func(e event.CreateEvent) bool { return true },
+				// CreateFunc: func(e event.CreateEvent) bool { return true },
 			}),
 		).
 		WatchesMetadata(
@@ -393,7 +386,7 @@ func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			builder.WithPredicates(pred, predicate.Funcs{
 				DeleteFunc: func(e event.DeleteEvent) bool { return true },
 				UpdateFunc: func(e event.UpdateEvent) bool { return true },
-				//CreateFunc: func(e event.CreateEvent) bool { return true },
+				// CreateFunc: func(e event.CreateEvent) bool { return true },
 			}))
 
 	return b.Complete(r)
