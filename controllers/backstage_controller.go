@@ -50,8 +50,7 @@ import (
 )
 
 const (
-	// FieldManager is the field manager used in ServerSide Apply and Create
-	FIELD_MANGER = "backstage-controller"
+	FIELD_MANAGER = "backstage-controller"
 )
 
 var watchedConfigSelector = metav1.LabelSelector{
@@ -155,7 +154,7 @@ func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.
 		// do not read Secrets
 		if _, ok := obj.Object().(*corev1.Secret); ok {
 			// try to create
-			if err := r.Create(ctx, obj.Object(), &client.CreateOptions{FieldManager: FIELD_MANGER}); err != nil {
+			if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: FIELD_MANAGER}); err != nil {
 				if !errors.IsAlreadyExists(err) {
 					return fmt.Errorf("failed to create secret: %w", err)
 				}
@@ -173,7 +172,7 @@ func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.
 					return fmt.Errorf("failed to get object: %w", err)
 				}
 
-				if err := r.Create(ctx, obj.Object(), &client.CreateOptions{FieldManager: FIELD_MANGER}); err != nil {
+				if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: FIELD_MANAGER}); err != nil {
 					return fmt.Errorf("failed to create object %w", err)
 				}
 
@@ -241,7 +240,7 @@ func (r *BackstageReconciler) patchObject(ctx context.Context, baseObject client
 		objectKind.SetGroupVersionKind(baseObject.GetObjectKind().GroupVersionKind())
 	}
 
-	if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: FIELD_MANGER}); err != nil {
+	if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: FIELD_MANAGER}); err != nil {
 		return fmt.Errorf("failed to patch object %s: %w", objDispName(obj), err)
 	}
 
